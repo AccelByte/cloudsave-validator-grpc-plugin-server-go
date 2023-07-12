@@ -16,7 +16,7 @@ type CloudsaveValidatorServer struct {
 	pb.UnimplementedCloudsaveValidatorServiceServer
 }
 
-func (s *CloudsaveValidatorServer) BeforeWriteGameRecord(ctx context.Context, request *pb.GameRecord) (*pb.ValidationResult, error) {
+func (s *CloudsaveValidatorServer) BeforeWriteGameRecord(ctx context.Context, request *pb.GameRecord) (*pb.GameRecordValidationResult, error) {
 	if strings.HasSuffix(request.GetKey(), "map") {
 		var r CustomGameRecord
 		err := json.Unmarshal(request.GetPayload(), &r)
@@ -29,7 +29,7 @@ func (s *CloudsaveValidatorServer) BeforeWriteGameRecord(ctx context.Context, re
 				ErrorMessage: err.Error(),
 			}
 
-			return &pb.ValidationResult{
+			return &pb.GameRecordValidationResult{
 				IsSuccess: false,
 				Key:       request.Key,
 				Error:     errorDetail,
@@ -37,10 +37,10 @@ func (s *CloudsaveValidatorServer) BeforeWriteGameRecord(ctx context.Context, re
 		}
 	}
 
-	return &pb.ValidationResult{IsSuccess: true, Key: request.Key}, nil
+	return &pb.GameRecordValidationResult{IsSuccess: true, Key: request.Key}, nil
 }
 
-func (s *CloudsaveValidatorServer) AfterReadGameRecord(ctx context.Context, gameRecord *pb.GameRecord) (*pb.ValidationResult, error) {
+func (s *CloudsaveValidatorServer) AfterReadGameRecord(ctx context.Context, gameRecord *pb.GameRecord) (*pb.GameRecordValidationResult, error) {
 	if strings.HasSuffix(gameRecord.Key, "daily_msg") {
 		var r DailyMessage
 		err := json.Unmarshal(gameRecord.GetPayload(), &r)
@@ -48,7 +48,7 @@ func (s *CloudsaveValidatorServer) AfterReadGameRecord(ctx context.Context, game
 			return nil, err
 		}
 		if time.Now().Before(r.AvailableOn) {
-			return &pb.ValidationResult{
+			return &pb.GameRecordValidationResult{
 				IsSuccess: false,
 				Key:       gameRecord.Key,
 				Error: &pb.Error{
@@ -59,11 +59,11 @@ func (s *CloudsaveValidatorServer) AfterReadGameRecord(ctx context.Context, game
 		}
 	}
 
-	return &pb.ValidationResult{IsSuccess: true, Key: gameRecord.Key}, nil
+	return &pb.GameRecordValidationResult{IsSuccess: true, Key: gameRecord.Key}, nil
 }
 
-func (s *CloudsaveValidatorServer) AfterBulkReadGameRecord(ctx context.Context, gameRecords *pb.BulkGameRecord) (*pb.BulkValidationResult, error) {
-	result := []*pb.ValidationResult{}
+func (s *CloudsaveValidatorServer) AfterBulkReadGameRecord(ctx context.Context, gameRecords *pb.BulkGameRecord) (*pb.BulkGameRecordValidationResult, error) {
+	result := []*pb.GameRecordValidationResult{}
 	for _, gameRecord := range gameRecords.GetGameRecords() {
 		if strings.HasSuffix(gameRecord.Key, "daily_msg") {
 			var r DailyMessage
@@ -72,7 +72,7 @@ func (s *CloudsaveValidatorServer) AfterBulkReadGameRecord(ctx context.Context, 
 				return nil, err
 			}
 			if time.Now().Before(r.AvailableOn) {
-				result = append(result, &pb.ValidationResult{
+				result = append(result, &pb.GameRecordValidationResult{
 					IsSuccess: false,
 					Key:       gameRecord.Key,
 					Error: &pb.Error{
@@ -81,23 +81,23 @@ func (s *CloudsaveValidatorServer) AfterBulkReadGameRecord(ctx context.Context, 
 					},
 				})
 			} else {
-				result = append(result, &pb.ValidationResult{
+				result = append(result, &pb.GameRecordValidationResult{
 					IsSuccess: true,
 					Key:       gameRecord.Key,
 				})
 			}
 		} else {
-			result = append(result, &pb.ValidationResult{
+			result = append(result, &pb.GameRecordValidationResult{
 				IsSuccess: true,
 				Key:       gameRecord.Key,
 			})
 		}
 	}
 
-	return &pb.BulkValidationResult{ValidationResults: result}, nil
+	return &pb.BulkGameRecordValidationResult{ValidationResults: result}, nil
 }
 
-func (s *CloudsaveValidatorServer) BeforeWritePlayerRecord(ctx context.Context, request *pb.PlayerRecord) (*pb.ValidationResult, error) {
+func (s *CloudsaveValidatorServer) BeforeWritePlayerRecord(ctx context.Context, request *pb.PlayerRecord) (*pb.PlayerRecordValidationResult, error) {
 	if strings.HasSuffix(request.GetKey(), "favourite_weapon") {
 		var r CustomPlayerRecord
 		err := json.Unmarshal(request.GetPayload(), &r)
@@ -110,32 +110,33 @@ func (s *CloudsaveValidatorServer) BeforeWritePlayerRecord(ctx context.Context, 
 				ErrorMessage: err.Error(),
 			}
 
-			return &pb.ValidationResult{
+			return &pb.PlayerRecordValidationResult{
 				IsSuccess: false,
 				Key:       request.Key,
+				UserId:    request.UserId,
 				Error:     errorDetail,
 			}, nil
 		}
 	}
 
-	return &pb.ValidationResult{IsSuccess: true, Key: request.Key}, nil
+	return &pb.PlayerRecordValidationResult{IsSuccess: true, Key: request.Key, UserId: request.UserId}, nil
 }
 
-func (s *CloudsaveValidatorServer) AfterReadPlayerRecord(ctx context.Context, playerRecord *pb.PlayerRecord) (*pb.ValidationResult, error) {
-	return &pb.ValidationResult{IsSuccess: true, Key: playerRecord.Key}, nil
+func (s *CloudsaveValidatorServer) AfterReadPlayerRecord(ctx context.Context, playerRecord *pb.PlayerRecord) (*pb.PlayerRecordValidationResult, error) {
+	return &pb.PlayerRecordValidationResult{IsSuccess: true, Key: playerRecord.Key, UserId: playerRecord.UserId}, nil
 }
 
-func (s *CloudsaveValidatorServer) AfterBulkReadPlayerRecord(ctx context.Context, playerRecords *pb.BulkPlayerRecord) (*pb.BulkValidationResult, error) {
-	result := []*pb.ValidationResult{}
+func (s *CloudsaveValidatorServer) AfterBulkReadPlayerRecord(ctx context.Context, playerRecords *pb.BulkPlayerRecord) (*pb.BulkPlayerRecordValidationResult, error) {
+	result := []*pb.PlayerRecordValidationResult{}
 
 	for _, record := range playerRecords.GetPlayerRecords() {
-		result = append(result, &pb.ValidationResult{IsSuccess: true, Key: record.Key})
+		result = append(result, &pb.PlayerRecordValidationResult{IsSuccess: true, Key: record.Key, UserId: record.UserId})
 	}
 
-	return &pb.BulkValidationResult{ValidationResults: result}, nil
+	return &pb.BulkPlayerRecordValidationResult{ValidationResults: result}, nil
 }
 
-func (s *CloudsaveValidatorServer) BeforeWriteAdminGameRecord(ctx context.Context, request *pb.AdminGameRecord) (*pb.ValidationResult, error) {
+func (s *CloudsaveValidatorServer) BeforeWriteAdminGameRecord(ctx context.Context, request *pb.AdminGameRecord) (*pb.GameRecordValidationResult, error) {
 	if strings.HasSuffix(request.GetKey(), "map") {
 		var r CustomGameRecord
 		err := json.Unmarshal(request.GetPayload(), &r)
@@ -148,7 +149,7 @@ func (s *CloudsaveValidatorServer) BeforeWriteAdminGameRecord(ctx context.Contex
 				ErrorMessage: err.Error(),
 			}
 
-			return &pb.ValidationResult{
+			return &pb.GameRecordValidationResult{
 				IsSuccess: false,
 				Key:       request.Key,
 				Error:     errorDetail,
@@ -156,10 +157,10 @@ func (s *CloudsaveValidatorServer) BeforeWriteAdminGameRecord(ctx context.Contex
 		}
 	}
 
-	return &pb.ValidationResult{IsSuccess: true, Key: request.Key}, nil
+	return &pb.GameRecordValidationResult{IsSuccess: true, Key: request.Key}, nil
 }
 
-func (s *CloudsaveValidatorServer) AfterReadAdminGameRecord(ctx context.Context, gameRecord *pb.AdminGameRecord) (*pb.ValidationResult, error) {
+func (s *CloudsaveValidatorServer) AfterReadAdminGameRecord(ctx context.Context, gameRecord *pb.AdminGameRecord) (*pb.GameRecordValidationResult, error) {
 	if strings.HasSuffix(gameRecord.Key, "daily_msg") {
 		var r DailyMessage
 		err := json.Unmarshal(gameRecord.GetPayload(), &r)
@@ -167,7 +168,7 @@ func (s *CloudsaveValidatorServer) AfterReadAdminGameRecord(ctx context.Context,
 			return nil, err
 		}
 		if time.Now().Before(r.AvailableOn) {
-			return &pb.ValidationResult{
+			return &pb.GameRecordValidationResult{
 				IsSuccess: false,
 				Key:       gameRecord.Key,
 				Error: &pb.Error{
@@ -178,11 +179,11 @@ func (s *CloudsaveValidatorServer) AfterReadAdminGameRecord(ctx context.Context,
 		}
 	}
 
-	return &pb.ValidationResult{IsSuccess: true, Key: gameRecord.Key}, nil
+	return &pb.GameRecordValidationResult{IsSuccess: true, Key: gameRecord.Key}, nil
 }
 
-func (s *CloudsaveValidatorServer) AfterBulkReadAdminGameRecord(ctx context.Context, gameRecords *pb.BulkAdminGameRecord) (*pb.BulkValidationResult, error) {
-	result := []*pb.ValidationResult{}
+func (s *CloudsaveValidatorServer) AfterBulkReadAdminGameRecord(ctx context.Context, gameRecords *pb.BulkAdminGameRecord) (*pb.BulkGameRecordValidationResult, error) {
+	result := []*pb.GameRecordValidationResult{}
 	for _, gameRecord := range gameRecords.GetAdminGameRecords() {
 		if strings.HasSuffix(gameRecord.Key, "daily_msg") {
 			var r DailyMessage
@@ -191,7 +192,7 @@ func (s *CloudsaveValidatorServer) AfterBulkReadAdminGameRecord(ctx context.Cont
 				return nil, err
 			}
 			if time.Now().Before(r.AvailableOn) {
-				result = append(result, &pb.ValidationResult{
+				result = append(result, &pb.GameRecordValidationResult{
 					IsSuccess: false,
 					Key:       gameRecord.Key,
 					Error: &pb.Error{
@@ -200,23 +201,23 @@ func (s *CloudsaveValidatorServer) AfterBulkReadAdminGameRecord(ctx context.Cont
 					},
 				})
 			} else {
-				result = append(result, &pb.ValidationResult{
+				result = append(result, &pb.GameRecordValidationResult{
 					IsSuccess: true,
 					Key:       gameRecord.Key,
 				})
 			}
 		} else {
-			result = append(result, &pb.ValidationResult{
+			result = append(result, &pb.GameRecordValidationResult{
 				IsSuccess: true,
 				Key:       gameRecord.Key,
 			})
 		}
 	}
 
-	return &pb.BulkValidationResult{ValidationResults: result}, nil
+	return &pb.BulkGameRecordValidationResult{ValidationResults: result}, nil
 }
 
-func (s *CloudsaveValidatorServer) BeforeWriteAdminPlayerRecord(ctx context.Context, request *pb.AdminPlayerRecord) (*pb.ValidationResult, error) {
+func (s *CloudsaveValidatorServer) BeforeWriteAdminPlayerRecord(ctx context.Context, request *pb.AdminPlayerRecord) (*pb.PlayerRecordValidationResult, error) {
 	if strings.HasSuffix(request.GetKey(), "player_activity") {
 		var r PlayerActivity
 		err := json.Unmarshal(request.GetPayload(), &r)
@@ -229,28 +230,29 @@ func (s *CloudsaveValidatorServer) BeforeWriteAdminPlayerRecord(ctx context.Cont
 				ErrorMessage: err.Error(),
 			}
 
-			return &pb.ValidationResult{
+			return &pb.PlayerRecordValidationResult{
 				IsSuccess: false,
 				Key:       request.Key,
+				UserId:    request.UserId,
 				Error:     errorDetail,
 			}, nil
 		}
 	}
 
-	return &pb.ValidationResult{IsSuccess: true, Key: request.Key}, nil
+	return &pb.PlayerRecordValidationResult{IsSuccess: true, Key: request.Key, UserId: request.UserId}, nil
 }
 
-func (s *CloudsaveValidatorServer) AfterReadAdminPlayerRecord(ctx context.Context, playerRecord *pb.AdminPlayerRecord) (*pb.ValidationResult, error) {
-	return &pb.ValidationResult{IsSuccess: true, Key: playerRecord.Key}, nil
+func (s *CloudsaveValidatorServer) AfterReadAdminPlayerRecord(ctx context.Context, playerRecord *pb.AdminPlayerRecord) (*pb.PlayerRecordValidationResult, error) {
+	return &pb.PlayerRecordValidationResult{IsSuccess: true, Key: playerRecord.Key, UserId: playerRecord.UserId}, nil
 }
 
-func (s *CloudsaveValidatorServer) AfterBulkReadAdminPlayerRecord(ctx context.Context, gameRecords *pb.BulkAdminPlayerRecord) (*pb.BulkValidationResult, error) {
-	result := []*pb.ValidationResult{}
+func (s *CloudsaveValidatorServer) AfterBulkReadAdminPlayerRecord(ctx context.Context, gameRecords *pb.BulkAdminPlayerRecord) (*pb.BulkPlayerRecordValidationResult, error) {
+	result := []*pb.PlayerRecordValidationResult{}
 	for _, record := range gameRecords.GetAdminPlayerRecords() {
-		result = append(result, &pb.ValidationResult{IsSuccess: true, Key: record.Key})
+		result = append(result, &pb.PlayerRecordValidationResult{IsSuccess: true, Key: record.Key, UserId: record.UserId})
 	}
 
-	return &pb.BulkValidationResult{ValidationResults: result}, nil
+	return &pb.BulkPlayerRecordValidationResult{ValidationResults: result}, nil
 }
 
 func NewCloudsaveValidationServiceServer() *CloudsaveValidatorServer {
