@@ -86,11 +86,12 @@ func (s *CloudsaveValidatorServer) AfterBulkReadGameRecord(ctx context.Context, 
 					Key:       gameRecord.Key,
 				})
 			}
+		} else {
+			result = append(result, &pb.ValidationResult{
+				IsSuccess: true,
+				Key:       gameRecord.Key,
+			})
 		}
-		result = append(result, &pb.ValidationResult{
-			IsSuccess: true,
-			Key:       gameRecord.Key,
-		})
 	}
 
 	return &pb.BulkValidationResult{ValidationResults: result}, nil
