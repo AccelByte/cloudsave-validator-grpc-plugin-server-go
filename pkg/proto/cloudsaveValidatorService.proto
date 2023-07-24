@@ -27,13 +27,9 @@ service CloudsaveValidatorService {
 
   // admin game record
   rpc BeforeWriteAdminGameRecord(AdminGameRecord) returns (GameRecordValidationResult);
-  rpc AfterReadAdminGameRecord(AdminGameRecord) returns (GameRecordValidationResult);
-  rpc AfterBulkReadAdminGameRecord(BulkAdminGameRecord) returns (BulkGameRecordValidationResult);
 
   // admin player record
   rpc BeforeWriteAdminPlayerRecord(AdminPlayerRecord) returns (PlayerRecordValidationResult);
-  rpc AfterReadAdminPlayerRecord(AdminPlayerRecord) returns (PlayerRecordValidationResult);
-  rpc AfterBulkReadAdminPlayerRecord(BulkAdminPlayerRecord) returns (BulkPlayerRecordValidationResult);
 }
 
 message GameRecord {
