@@ -31,7 +31,7 @@ Player record with key that has suffix `favourite_weapon` expect follows this sc
 This simple app will demonstrate custom record validation above.
 This app contains scenario when client send invalid JSON schema to cloudsave-validator.
 
-When client send create game record with key using suffix `favourite_weapon` with invalid request body:
+When client send create player record with key using suffix `favourite_weapon` with invalid request body:
 ```json
 {
   "foo": "bar"
@@ -43,6 +43,7 @@ cloudsave-validator will response
 {
   "isSuccess": false,
   "key": "string, key of record",
+  "userId": "string, player user ID",
   "error": {
     "errorCode": 1,
     "errorMessage": "userid cannot be empty;favouriteWeaponType cannot be empty;favouriteWeapon cannot be empty"
@@ -52,7 +53,7 @@ cloudsave-validator will response
 
 ### Use case 2: custom validation logic
 
-A game record with key that has suffix `daily_message` are expected to have following schema:
+A game record with key that has suffix `daily_msg` are expected to have following schema:
 ```json
 {
   "message": "string,required",
