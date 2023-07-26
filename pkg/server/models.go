@@ -44,7 +44,7 @@ func (c *CustomPlayerRecord) Validate() error {
 	if err != nil {
 		return err
 	}
-	if c.FavouriteWeapon != WeaponTypeSword && c.FavouriteWeaponType != WeaponTypeGun {
+	if c.FavouriteWeaponType != WeaponTypeSword && c.FavouriteWeaponType != WeaponTypeGun {
 		return errors.New("invalid weapon type")
 	}
 
