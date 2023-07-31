@@ -5,16 +5,22 @@
 package main
 
 import (
-	"cloudsave-validator-grpc-plugin-server-go/pkg/server"
 	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"time"
+
+	promgrpc "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
+
+	"cloudsave-validator-grpc-plugin-server-go/pkg/common"
+	"cloudsave-validator-grpc-plugin-server-go/pkg/server"
 
 	pb "cloudsave-validator-grpc-plugin-server-go/pkg/pb"
 
@@ -23,9 +29,9 @@ import (
 	sdkAuth "github.com/AccelByte/accelbyte-go-sdk/services-api/pkg/utils/auth"
 	"github.com/AccelByte/accelbyte-go-sdk/services-api/pkg/utils/auth/validator"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
-	prometheusGrpc "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusCollectors "github.com/prometheus/client_golang/prometheus/collectors"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -39,22 +45,37 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var (
+const (
 	environment     = "production"
 	id              = int64(1)
 	metricsEndpoint = "/metrics"
 	metricsPort     = 8080
-	port            = 6565
-	serviceName     = server.GetEnv("OTEL_SERVICE_NAME", "CustomCouldsaveValidatorServiceGoServerDocker")
+	grpcPort        = 6565
+)
+
+var (
+	serviceName = common.GetEnv("OTEL_SERVICE_NAME", "CustomCouldsaveValidatorServiceGoServerDocker")
+	logLevelStr = common.GetEnv("LOG_LEVEL", logrus.InfoLevel.String())
 )
 
 func main() {
+	go func() {
+		runtime.SetBlockProfileRate(1)
+		runtime.SetMutexProfileFraction(10)
+	}()
 	logrus.Infof("starting app server..")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	opts := []logging.Option{
+	logrusLevel, err := logrus.ParseLevel(logLevelStr)
+	if err != nil {
+		logrusLevel = logrus.InfoLevel
+	}
+	logrusLogger := logrus.New()
+	logrusLogger.SetLevel(logrusLevel)
+
+	loggingOptions := []logging.Option{
 		logging.WithLogOnEvents(logging.StartCall, logging.FinishCall, logging.PayloadReceived, logging.PayloadSent),
 		logging.WithFieldsFromContext(func(ctx context.Context) logging.Fields {
 			if span := trace.SpanContextFromContext(ctx); span.IsSampled() {
@@ -67,20 +88,20 @@ func main() {
 		logging.WithDurationField(logging.DurationToDurationField),
 	}
 
+	srvMetrics := promgrpc.NewServerMetrics()
 	unaryServerInterceptors := []grpc.UnaryServerInterceptor{
 		otelgrpc.UnaryServerInterceptor(),
-		logging.UnaryServerInterceptor(server.InterceptorLogger(logrus.New()), opts...),
+		srvMetrics.UnaryServerInterceptor(),
+		logging.UnaryServerInterceptor(common.InterceptorLogger(logrusLogger), loggingOptions...),
 	}
 	streamServerInterceptors := []grpc.StreamServerInterceptor{
 		otelgrpc.StreamServerInterceptor(),
-		prometheusGrpc.StreamServerInterceptor,
-		logging.StreamServerInterceptor(server.InterceptorLogger(logrus.New()), opts...),
+		srvMetrics.StreamServerInterceptor(),
+		logging.StreamServerInterceptor(common.InterceptorLogger(logrusLogger), loggingOptions...),
 	}
 
-	if strings.ToLower(server.GetEnv("PLUGIN_GRPC_SERVER_AUTH_ENABLED", "false")) == "true" {
-		// unaryServerInterceptors = append(unaryServerInterceptors, server.EnsureValidToken) // deprecated
-
-		refreshInterval := server.GetEnvInt("REFRESH_INTERVAL", 600)
+	if strings.ToLower(common.GetEnv("PLUGIN_GRPC_SERVER_AUTH_ENABLED", "false")) == "true" {
+		refreshInterval := common.GetEnvInt("REFRESH_INTERVAL", 600)
 		configRepo := sdkAuth.DefaultConfigRepositoryImpl()
 		tokenRepo := sdkAuth.DefaultTokenRepositoryImpl()
 		authService := iam.OAuth20Service{
@@ -88,39 +109,38 @@ func main() {
 			ConfigRepository: configRepo,
 			TokenRepository:  tokenRepo,
 		}
-		server.Validator = validator.NewTokenValidator(authService, time.Duration(refreshInterval)*time.Second)
-		server.Validator.Initialize()
+		common.Validator = validator.NewTokenValidator(authService, time.Duration(refreshInterval)*time.Second)
+		common.Validator.Initialize()
 
-		unaryServerInterceptors = append(unaryServerInterceptors, server.UnaryAuthServerIntercept)
-		streamServerInterceptors = append(streamServerInterceptors, server.StreamAuthServerIntercept)
+		unaryServerInterceptors = append(unaryServerInterceptors, common.UnaryAuthServerIntercept)
+		streamServerInterceptors = append(streamServerInterceptors, common.StreamAuthServerIntercept)
 		logrus.Infof("added auth interceptors")
 	}
 
 	// Create gRPC Server
-	s := grpc.NewServer(
+	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(unaryServerInterceptors...),
 		grpc.ChainStreamInterceptor(streamServerInterceptors...),
 	)
 
 	// Register Filter Service
 	cloudsaveValidatorServer := server.NewCloudsaveValidationServiceServer()
-	pb.RegisterCloudsaveValidatorServiceServer(s, cloudsaveValidatorServer)
+	pb.RegisterCloudsaveValidatorServiceServer(grpcServer, cloudsaveValidatorServer)
 
 	// Enable gRPC Reflection
-	reflection.Register(s)
+	reflection.Register(grpcServer)
 	logrus.Infof("gRPC reflection enabled")
 
 	// Enable gRPC Health Check
-	grpc_health_v1.RegisterHealthServer(s, health.NewServer())
-
-	prometheusGrpc.Register(s)
+	grpc_health_v1.RegisterHealthServer(grpcServer, health.NewServer())
 
 	// Register Prometheus Metrics
+	srvMetrics.InitializeMetrics(grpcServer)
 	prometheusRegistry := prometheus.NewRegistry()
 	prometheusRegistry.MustRegister(
 		prometheusCollectors.NewGoCollector(),
 		prometheusCollectors.NewProcessCollector(prometheusCollectors.ProcessCollectorOpts{}),
-		prometheusGrpc.DefaultServerMetrics,
+		srvMetrics,
 	)
 
 	go func() {
@@ -130,7 +150,7 @@ func main() {
 	logrus.Infof("serving prometheus metrics at: (:%d%s)", metricsPort, metricsEndpoint)
 
 	// Set Tracer Provider
-	tracerProvider, err := server.NewTracerProvider(serviceName, environment, id)
+	tracerProvider, err := common.NewTracerProvider(serviceName, environment, id)
 	if err != nil {
 		logrus.Fatalf("failed to create tracer provider: %v", err)
 
@@ -156,14 +176,14 @@ func main() {
 
 	// Start gRPC Server
 	logrus.Infof("starting gRPC server..")
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
-		logrus.Fatalf("failed to listen to tcp:%d: %v", port, err)
+		logrus.Fatalf("failed to listen to tcp:%d: %v", grpcPort, err)
 
 		return
 	}
 	go func() {
-		if err = s.Serve(lis); err != nil {
+		if err = grpcServer.Serve(lis); err != nil {
 			logrus.Fatalf("failed to run gRPC server: %v", err)
 
 			return

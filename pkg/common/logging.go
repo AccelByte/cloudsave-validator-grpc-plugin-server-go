@@ -2,11 +2,12 @@
 // This is licensed software from AccelByte Inc, for limitations
 // and restrictions contact your company contract manager.
 
-package server
+package common
 
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/sirupsen/logrus"
@@ -14,25 +15,26 @@ import (
 
 // InterceptorLogger adapts logrus logger to interceptor logger.
 // This code is referenced from https://github.com/grpc-ecosystem/go-grpc-middleware/
-func InterceptorLogger(l logrus.FieldLogger) logging.Logger {
-	return logging.LoggerFunc(func(_ context.Context, lvl logging.Level, msg string, fields ...interface{}) {
-		f := make(map[string]interface{}, len(fields)/2)
-		i := logging.Fields(fields).Iterator()
-		if i.Next() {
-			k, v := i.At()
-			f[k] = v
+func InterceptorLogger(logger logrus.FieldLogger) logging.Logger {
+	return logging.LoggerFunc(func(_ context.Context, lvl logging.Level, msg string, fields ...any) {
+		logrusFields := make(map[string]any, len(fields))
+		iterator := logging.Fields(fields).Iterator()
+		for iterator.Next() {
+			k, fieldValue := iterator.At()
+			fieldName := strings.ReplaceAll(k, ".", "_")
+			logrusFields[fieldName] = fieldValue
 		}
-		l = l.WithFields(f)
+		logger = logger.WithFields(logrusFields)
 
 		switch lvl {
 		case logging.LevelDebug:
-			l.Debug(msg)
+			logger.Debug(msg)
 		case logging.LevelInfo:
-			l.Info(msg)
+			logger.Info(msg)
 		case logging.LevelWarn:
-			l.Warn(msg)
+			logger.Warn(msg)
 		case logging.LevelError:
-			l.Error(msg)
+			logger.Error(msg)
 		default:
 			panic(fmt.Sprintf("unknown level %v", lvl))
 		}
