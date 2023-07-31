@@ -5,11 +5,12 @@
 package server
 
 import (
-	pb "cloudsave-validator-grpc-plugin-server-go/pkg/pb"
 	"context"
 	"encoding/json"
 	"strings"
 	"time"
+
+	pb "cloudsave-validator-grpc-plugin-server-go/pkg/pb"
 )
 
 type CloudsaveValidatorServer struct {
@@ -36,7 +37,6 @@ func (s *CloudsaveValidatorServer) BeforeWriteGameRecord(ctx context.Context, re
 			}, nil
 		}
 	}
-
 	return &pb.GameRecordValidationResult{IsSuccess: true, Key: request.Key}, nil
 }
 
