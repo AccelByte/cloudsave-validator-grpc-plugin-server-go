@@ -37,6 +37,7 @@ func (s *CloudsaveValidatorServer) BeforeWriteGameRecord(ctx context.Context, re
 			}, nil
 		}
 	}
+
 	return &pb.GameRecordValidationResult{IsSuccess: true, Key: request.Key}, nil
 }
 
