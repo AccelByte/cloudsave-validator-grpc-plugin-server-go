@@ -156,9 +156,3 @@ To (build and) run this sample app in a container, use the following command.
 ```
 docker-compose up --build
 ```
-
-## Testing
-
-### Functional Test in Local Development Environment
-
-The custom function in this sample app can be tested locally using [sample grpc client](https://bitbucket.org/mrth0103/cloudsave-validator-client/src/master/).
