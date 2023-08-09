@@ -14,67 +14,6 @@ This repository contains a `sample custom cloudsave validator gRPC server app` w
 This sample app also shows how this `gRPC server` can be instrumented for better observability.
 It is configured by default to send metrics, traces, and logs to the observability `dependency services` in [grpc-plugin-dependencies](https://github.com/AccelByte/grpc-plugin-dependencies).
 
-
-## Sample use case
-
-### Use case 1: schema validation
-
-Player record with key that has suffix `favourite_weapon` expect follows this schema:
-```json
-{
-  "userId": "string,required",
-  "favouriteWeaponType": "enum [SWORD, GUN], required",
-  "favouriteWeapon": "string"
-}
-```
-
-This simple app will demonstrate custom record validation above.
-This app contains scenario when client send invalid JSON schema to cloudsave-validator.
-
-When client send create player record with key using suffix `favourite_weapon` with invalid request body:
-```json
-{
-  "foo": "bar"
-}
-```
-
-cloudsave-validator will response
-```json
-{
-  "isSuccess": false,
-  "key": "string, key of record",
-  "userId": "string, player user ID",
-  "error": {
-    "errorCode": 1,
-    "errorMessage": "userid cannot be empty;favouriteWeaponType cannot be empty;favouriteWeapon cannot be empty"
-  }
-}
-```
-
-### Use case 2: custom validation logic
-
-A game record with key that has suffix `daily_msg` are expected to have following schema:
-```json
-{
-  "message": "string,required",
-  "title": "string,required",
-  "availableOn": "time"
-}
-```
-
-`cloudsave-validator` can be used to validate whether this game record are eligible to accessed by validating time in field `availableOn`.
-When client send get game record request with time stamp is before `availableOn`, cloudsave-validator will return following response:
-```json
-{
-  "isSuccess": false,
-  "key": "string, key of record",
-  "error": {
-    "errorCode": 2,
-    "errorMessage": "not accessible yet"
-  }
-}
-```
-
 ## Prerequisites
 
 Before starting, you will need the following.
@@ -155,4 +94,64 @@ To (build and) run this sample app in a container, use the following command.
 
 ```
 docker-compose up --build
+```
+
+## Sample use case
+
+### Use case 1: schema validation
+
+Player record with key that has suffix `favourite_weapon` expect follows this schema:
+```json
+{
+  "userId": "string,required",
+  "favouriteWeaponType": "enum [SWORD, GUN], required",
+  "favouriteWeapon": "string"
+}
+```
+
+This simple app will demonstrate custom record validation above.
+This app contains scenario when client send invalid JSON schema to cloudsave-validator.
+
+When client send create player record with key using suffix `favourite_weapon` with invalid request body:
+```json
+{
+  "foo": "bar"
+}
+```
+
+cloudsave-validator will response
+```json
+{
+  "isSuccess": false,
+  "key": "string, key of record",
+  "userId": "string, player user ID",
+  "error": {
+    "errorCode": 1,
+    "errorMessage": "userid cannot be empty;favouriteWeaponType cannot be empty;favouriteWeapon cannot be empty"
+  }
+}
+```
+
+### Use case 2: custom validation logic
+
+A game record with key that has suffix `daily_msg` are expected to have following schema:
+```json
+{
+  "message": "string,required",
+  "title": "string,required",
+  "availableOn": "time"
+}
+```
+
+`cloudsave-validator` can be used to validate whether this game record are eligible to accessed by validating time in field `availableOn`.
+When client send get game record request with time stamp is before `availableOn`, cloudsave-validator will return following response:
+```json
+{
+  "isSuccess": false,
+  "key": "string, key of record",
+  "error": {
+    "errorCode": 2,
+    "errorMessage": "not accessible yet"
+  }
+}
 ```
