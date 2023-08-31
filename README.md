@@ -1,5 +1,18 @@
 # cloudsave-validator-grpc-plugin-server-go
 
+```mermaid
+flowchart LR
+   subgraph AccelByte Gaming Services
+   CL[gRPC Client]
+   end
+   subgraph gRPC Server Deployment
+   SV["gRPC Server\n(YOU ARE HERE)"]
+   DS[Dependency Services]
+   CL --- DS
+   end
+   DS --- SV
+```
+
 `AccelByte Gaming Services` capabilities can be extended using custom functions implemented in a `gRPC server`. If configured, custom functions in the `gRPC server` will be called by `AccelByte Gaming Services` instead of the default function.
 
 The `gRPC server` and the `gRPC client` can actually communicate directly. However, additional services are necessary to provide **security**, **reliability**, **scalability**, and **observability**. We call these services as `dependency services`. The [grpc-plugin-dependencies](https://github.com/AccelByte/grpc-plugin-dependencies) repository is provided as an example of what these `dependency services` may look like. It
