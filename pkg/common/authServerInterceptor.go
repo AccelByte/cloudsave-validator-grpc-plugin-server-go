@@ -77,7 +77,7 @@ func getNamespace() string {
 }
 
 func getResourceName() string {
-	return GetEnv("AB_RESOURCE_NAME", "CHATGRPCSERVICE")
+	return GetEnv("AB_RESOURCE_NAME", "CLOUDSAVEGRPCSERVICE")
 }
 
 func getRequiredPermission() validator.Permission {
