@@ -35,7 +35,7 @@ Before starting, you will need the following.
 
    a. bash
 
-   b. curl
+   b. make
 
    c. docker v23.x
 
@@ -43,19 +43,17 @@ Before starting, you will need the following.
 
    e. docker loki driver
 
-      ```  
+      ```
       docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
       ```
 
-   f. make
+   f. go 1.19
 
-   g. go v1.19
+   g. git
 
-   h. git
+   h. [ngrok](https://ngrok.com/)
 
-   i. jq
-
-   j. [ngrok](https://ngrok.com/)
+   i. [postman](https://www.postman.com/)
 
 2. A local copy of [grpc-plugin-dependencies](https://github.com/AccelByte/grpc-plugin-dependencies) repository.
 
