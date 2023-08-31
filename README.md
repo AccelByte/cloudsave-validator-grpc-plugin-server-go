@@ -37,23 +37,27 @@ Before starting, you will need the following.
 
    b. make
 
-   c. docker v23.x
+   c. curl
 
-   d. docker-compose v2.x
+   d. docker v23.x
 
-   e. docker loki driver
+   e. docker-compose v2.x
+
+   f. docker loki driver
 
       ```
       docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
       ```
 
-   f. go 1.19
+   g. go 1.19
 
-   g. git
+   h. git
 
-   h. [ngrok](https://ngrok.com/)
+   i. jq
 
-   i. [postman](https://www.postman.com/)
+   j. [ngrok](https://ngrok.com/)
+
+   k. [postman](https://www.postman.com/)
 
 2. A local copy of [grpc-plugin-dependencies](https://github.com/AccelByte/grpc-plugin-dependencies) repository.
 
@@ -111,62 +115,204 @@ To (build and) run this sample app in a container, use the following command.
 docker-compose up --build
 ```
 
-## Sample use case
+## Testing
 
-### Use case 1: schema validation
+### Functional Test in Local Development Environment
 
-Player record with key that has suffix `favourite_weapon` expect follows this schema:
-```json
-{
-  "userId": "string,required",
-  "favouriteWeaponType": "enum [SWORD, GUN], required",
-  "favouriteWeapon": "string"
-}
-```
+The custom functions in this sample app can be tested locally using `postman`.
 
-This simple app will demonstrate custom record validation above.
-This app contains scenario when client send invalid JSON schema to cloudsave-validator.
+1. Run the `dependency services` by following the `README.md` in the [grpc-plugin-dependencies](https://github.com/AccelByte/grpc-plugin-dependencies) repository.
 
-When client send create player record with key using suffix `favourite_weapon` with invalid request body:
-```json
-{
-  "foo": "bar"
-}
-```
+   > :warning: **Make sure to start dependency services with mTLS disabled for now**: It is currently not supported by `AccelByte Gaming Services`, but it will be enabled later on to improve security. If it is enabled, the gRPC client calls without mTLS will be rejected.
 
-cloudsave-validator will response
-```json
-{
-  "isSuccess": false,
-  "key": "string, key of record",
-  "userId": "string, player user ID",
-  "error": {
-    "errorCode": 1,
-    "errorMessage": "userid cannot be empty;favouriteWeaponType cannot be empty;favouriteWeapon cannot be empty"
-  }
-}
-```
+2. Run this `gRPC server` sample app.
 
-### Use case 2: custom validation logic
+3. Open `postman`, create a new `gRPC request` (tutorial [here](https://blog.postman.com/postman-now-supports-grpc/)), and enter `localhost:10000` as server URL. 
 
-A game record with key that has suffix `daily_msg` are expected to have following schema:
-```json
-{
-  "message": "string,required",
-  "title": "string,required",
-  "availableOn": "time"
-}
-```
+   > :exclamation: We are essentially accessing the `gRPC server` through an `Envoy` proxy in `dependency services`.
 
-`cloudsave-validator` can be used to validate whether this game record are eligible to accessed by validating time in field `availableOn`.
-When client send get game record request with time stamp is before `availableOn`, cloudsave-validator will return following response:
-```json
-{
-  "isSuccess": false,
-  "key": "string, key of record",
-  "error": {
-    "errorCode": 2,
-    "errorMessage": "not accessible yet"
-  }
-}
-```
+4. Still in `postman`, continue by selecting `CloudsaveValidatorService/BeforeWritePlayerRecord` method and invoke it with the sample message below.
+
+   a. With a VALID `payload`
+
+      ```json
+      {
+          "createdAt": {
+              "nanos": 10,
+              "seconds": "1693468029"
+          },
+          "isPublic": true,
+          "key": "favourite_weapon",
+          "namespace": "mynamespace",
+          "payload": "eyJ1c2VySWQiOiAiMWUwNzZiY2VlNmQxNGM4NDlmZmIxMjFjMGUwMTM1YmUiLCAiZmF2b3VyaXRlV2VhcG9uVHlwZSI6ICJTV09SRCIsICJmYXZvdXJpdGVXZWFwb24iOiAiZXhjYWxpYnVyIn0=",  // {"userId": "1e076bcee6d14c849ffb121c0e0135be", "favouriteWeaponType": "SWORD", "favouriteWeapon": "excalibur"} encoded in base64
+          "setBy": "SERVER",
+          "updatedAt": {
+              "nanos": 10,
+              "seconds": "1693468275"
+          },
+          "userId": "1e076bcee6d14c849ffb121c0e0135be"
+      }
+      ```
+
+      The response will contain `isSuccess: true`
+
+      ```json
+      {
+          "isSuccess": true,
+          "key": "favourite_weapon",
+          "userId": "1e076bcee6d14c849ffb121c0e0135be"
+      }
+      ```
+
+   b. With an INVALID `payload`
+   
+      ```json
+      {
+          "createdAt": {
+              "nanos": 10,
+              "seconds": "1693468029"
+          },
+          "isPublic": true,
+          "key": "favourite_weapon",
+          "namespace": "mynamespace",
+          "payload": "eyJmb28iOiJiYXIifQ==",  // {"foo":"bar"} encoded in base64
+          "setBy": "SERVER",
+          "updatedAt": {
+              "nanos": 10,
+              "seconds": "1693468275"
+          },
+          "userId": "1e076bcee6d14c849ffb121c0e0135be"
+      }
+      ```
+
+      The response will contain `isSuccess: false`
+
+      ```json
+      {
+          "isSuccess": false,
+          "key": "favourite_weapon",
+          "userId": "1e076bcee6d14c849ffb121c0e0135be",
+          "error": {
+              "errorCode": 1,
+              "errorMessage": "favourite weapon cannot be empty;favourite weapon type cannot be empty;user ID cannot be empty"
+          }
+      }
+      ```
+    
+5. Next, continue by selecting `CloudsaveValidatorService/AfterReadGameRecord` method and invoke it with the sample message below.
+
+   a. With a VALID `payload` - `availableOn` is in the past
+
+      ```json
+      {
+          "createdAt": {
+              "nanos": 10,
+              "seconds": "1693468029"
+          },
+          "isPublic": true,
+          "key": "daily_msg",
+          "namespace": "mynamespace",
+          "payload": "eyJtZXNzYWdlIjoibXltc2ciLCJ0aXRsZSI6Im15dGl0bGUiLCJhdmFpbGFibGVPbiI6IjIwMjMtOC0xMyJ9",  // {"message":"mymsg","title":"mytitle","availableOn":"2023-08-13T00:00:00.000Z"} encoded in base64
+          "setBy": "SERVER",
+          "updatedAt": {
+              "nanos": 10,
+              "seconds": "1693468275"
+          },
+          "userId": "1e076bcee6d14c849ffb121c0e0135be"
+      }
+      ```
+
+      The response will contain `isSuccess: true`
+
+      ```json
+      {
+          "isSuccess": true,
+          "key": "daily_msg"
+      }
+      ```
+
+   b. With an INVALID `payload` - `availableOn` is in the future
+   
+      ```json
+       {
+          "createdAt": {
+              "nanos": 10,
+              "seconds": "1693468029"
+          },
+          "isPublic": true,
+          "key": "daily_msg",
+          "namespace": "mynamespace",
+          "payload": "eyJtZXNzYWdlIjoibXltc2ciLCJ0aXRsZSI6Im15dGl0bGUiLCJhdmFpbGFibGVPbiI6IjIwOTktMDgtMTNUMDA6MDA6MDAuMDAwWiJ9",  // {"message":"mymsg","title":"mytitle","availableOn":"2099-08-13T00:00:00.000Z"} encoded in base64
+          "setBy": "SERVER",
+          "updatedAt": {
+              "nanos": 10,
+              "seconds": "1693468275"
+          },
+          "userId": "1e076bcee6d14c849ffb121c0e0135be"
+      }
+      ```
+
+      The response will contain `isSuccess: false`
+
+      ```json
+      {
+          "isSuccess": false,
+          "key": "daily_msg",
+          "error": {
+              "errorCode": 2,
+              "errorMessage": "not accessible yet"
+          }
+      }
+      ```
+
+   
+
+
+### Integration Test with AccelByte Gaming Services
+
+After passing functional test in local development environment, you may want to perform
+integration test with `AccelByte Gaming Services`. Here, we are going to expose the `gRPC server`
+in local development environment to the internet so that it can be called by
+`AccelByte Gaming Services`. To do this without requiring public IP, we can use [ngrok](https://ngrok.com/)
+
+
+1. Run the `dependency services` by following the `README.md` in the [grpc-plugin-dependencies](https://github.com/AccelByte/grpc-plugin-dependencies) repository.
+
+   > :warning: **Make sure to start dependency services with mTLS disabled for now**: It is currently not supported by `AccelByte Gaming Services`, but it will be enabled later on to improve security. If it is enabled, the gRPC client calls without mTLS will be rejected.
+
+
+2. Run this `gRPC server` sample app.
+
+3. Sign-in/sign-up to [ngrok](https://ngrok.com/) and get your auth token in `ngrok` dashboard.
+
+4. In [grpc-plugin-dependencies](https://github.com/AccelByte/grpc-plugin-dependencies) repository folder, run the following command to expose the `Envoy` proxy port connected to the `gRPC server` in local development environment to the internet. Take a note of the `ngrok` forwarding URL e.g. `tcp://0.tcp.ap.ngrok.io:xxxxx`.
+
+   ```
+   make ngrok NGROK_AUTHTOKEN=xxxxxxxxxxx    # Use your ngrok auth token
+   ```
+
+5. [Create an OAuth Client](https://docs.accelbyte.io/guides/access/iam-client.html) with `confidential` client type with the following permissions. Keep the `Client ID` and `Client Secret`.
+
+   - ADMIN:NAMESPACE:{namespace}:CLOUDSAVE:PLUGINS [CREATE, READ, UPDATE, DELETE]
+   - ADMIN:NAMESPACE:{namespace}:USER:*:CLOUDSAVE:RECORD [CREATE, READ, UPDATE, DELETE]
+   - ADMIN:NAMESPACE:{namespace}:CLOUDSAVE:RECORD [CREATE, READ, UPDATE, DELETE]
+   - NAMESPACE:{namespace}:CLOUDSAVE:RECORD [CREATE, READ, UPDATE, DELETE]
+   - ADMIN:NAMESPACE:{namespace}:INFORMATION:USER:* [DELETE]
+
+   > :warning: **Oauth Client created in this step is different from the one from Prerequisites section:** It is required by [demo.sh](demo.sh) script in the next step to register the `gRPC Server` URL and also to create and delete test users.
+
+6. Run the [demo.sh](demo.sh) script to simulate cloudsave operation which calls this sample `gRPC server` using the `Client ID` and `Client Secret` created in the previous step. Pay attention to sample `gRPC server` console log when the script is running. `gRPC Server` methods should get called.
+
+   ```
+   export AB_BASE_URL='https://demo.accelbyte.io'
+   export AB_CLIENT_ID='xxxxxxxxxx'         # Use Client ID from the previous step
+   export AB_CLIENT_SECRET='xxxxxxxxxx'     # Use Client Secret from the previous step    
+   export AB_NAMESPACE='accelbyte'          # Use your Namespace ID
+   export GRPC_SERVER_URL='0.tcp.ap.ngrok.io:xxxxx'  # Use your ngrok forwarding URL
+   bash demo.sh
+   ```
+
+   > :warning: **Make sure demo.sh has Unix line-endings (LF)**: If this repository was cloned in Windows for example, the `demo.sh` may have Windows line-endings (CRLF) instead. In this case, use tools like `dos2unix` to change the line-endings to Unix (LF).
+   Invalid line-endings may cause errors such as `demo.sh: line 2: $'\r': command not found`.
+
+> :warning: **Ngrok free plan has some limitations**: You may want to use paid plan if the traffic is high.
