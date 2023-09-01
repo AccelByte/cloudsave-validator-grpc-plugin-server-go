@@ -198,75 +198,6 @@ The custom functions in this sample app can be tested locally using `postman`.
           }
       }
       ```
-    
-5. Next, continue by selecting `CloudsaveValidatorService/AfterReadGameRecord` method and invoke it with the sample message below.
-
-   a. With a VALID `payload` - `availableOn` is in the past
-
-      ```json
-      {
-          "createdAt": {
-              "nanos": 10,
-              "seconds": "1693468029"
-          },
-          "isPublic": true,
-          "key": "daily_msg",
-          "namespace": "mynamespace",
-          "payload": "eyJtZXNzYWdlIjoibXltc2ciLCJ0aXRsZSI6Im15dGl0bGUiLCJhdmFpbGFibGVPbiI6IjIwMjMtOC0xMyJ9",  // {"message":"mymsg","title":"mytitle","availableOn":"2023-08-13T00:00:00.000Z"} encoded in base64
-          "setBy": "SERVER",
-          "updatedAt": {
-              "nanos": 10,
-              "seconds": "1693468275"
-          },
-          "userId": "1e076bcee6d14c849ffb121c0e0135be"
-      }
-      ```
-
-      The response will contain `isSuccess: true`
-
-      ```json
-      {
-          "isSuccess": true,
-          "key": "daily_msg"
-      }
-      ```
-
-   b. With an INVALID `payload` - `availableOn` is in the future
-   
-      ```json
-       {
-          "createdAt": {
-              "nanos": 10,
-              "seconds": "1693468029"
-          },
-          "isPublic": true,
-          "key": "daily_msg",
-          "namespace": "mynamespace",
-          "payload": "eyJtZXNzYWdlIjoibXltc2ciLCJ0aXRsZSI6Im15dGl0bGUiLCJhdmFpbGFibGVPbiI6IjIwOTktMDgtMTNUMDA6MDA6MDAuMDAwWiJ9",  // {"message":"mymsg","title":"mytitle","availableOn":"2099-08-13T00:00:00.000Z"} encoded in base64
-          "setBy": "SERVER",
-          "updatedAt": {
-              "nanos": 10,
-              "seconds": "1693468275"
-          },
-          "userId": "1e076bcee6d14c849ffb121c0e0135be"
-      }
-      ```
-
-      The response will contain `isSuccess: false`
-
-      ```json
-      {
-          "isSuccess": false,
-          "key": "daily_msg",
-          "error": {
-              "errorCode": 2,
-              "errorMessage": "not accessible yet"
-          }
-      }
-      ```
-
-   
-
 
 ### Integration Test with AccelByte Gaming Services
 
@@ -275,11 +206,9 @@ integration test with `AccelByte Gaming Services`. Here, we are going to expose 
 in local development environment to the internet so that it can be called by
 `AccelByte Gaming Services`. To do this without requiring public IP, we can use [ngrok](https://ngrok.com/)
 
-
 1. Run the `dependency services` by following the `README.md` in the [grpc-plugin-dependencies](https://github.com/AccelByte/grpc-plugin-dependencies) repository.
 
    > :warning: **Make sure to start dependency services with mTLS disabled for now**: It is currently not supported by `AccelByte Gaming Services`, but it will be enabled later on to improve security. If it is enabled, the gRPC client calls without mTLS will be rejected.
-
 
 2. Run this `gRPC server` sample app.
 
