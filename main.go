@@ -15,9 +15,6 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
-	"time"
-
-	promgrpc "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 
 	"cloudsave-validator-grpc-plugin-server-go/pkg/common"
 	"cloudsave-validator-grpc-plugin-server-go/pkg/server"
@@ -27,7 +24,7 @@ import (
 	"github.com/AccelByte/accelbyte-go-sdk/services-api/pkg/factory"
 	"github.com/AccelByte/accelbyte-go-sdk/services-api/pkg/service/iam"
 	sdkAuth "github.com/AccelByte/accelbyte-go-sdk/services-api/pkg/utils/auth"
-	"github.com/AccelByte/accelbyte-go-sdk/services-api/pkg/utils/auth/validator"
+	promgrpc "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusCollectors "github.com/prometheus/client_golang/prometheus/collectors"
@@ -101,16 +98,15 @@ func main() {
 	}
 
 	if strings.ToLower(common.GetEnv("PLUGIN_GRPC_SERVER_AUTH_ENABLED", "false")) == "true" {
-		refreshInterval := common.GetEnvInt("REFRESH_INTERVAL", 600)
 		configRepo := sdkAuth.DefaultConfigRepositoryImpl()
 		tokenRepo := sdkAuth.DefaultTokenRepositoryImpl()
-		authService := iam.OAuth20Service{
+		common.OAuth = &iam.OAuth20Service{
 			Client:           factory.NewIamClient(configRepo),
 			ConfigRepository: configRepo,
 			TokenRepository:  tokenRepo,
 		}
-		common.Validator = validator.NewTokenValidator(authService, time.Duration(refreshInterval)*time.Second)
-		common.Validator.Initialize()
+
+		common.OAuth.SetLocalValidation(true)
 
 		unaryServerInterceptors = append(unaryServerInterceptors, common.UnaryAuthServerIntercept)
 		streamServerInterceptors = append(streamServerInterceptors, common.StreamAuthServerIntercept)
