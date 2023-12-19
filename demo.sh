@@ -25,6 +25,13 @@ get_code_challenge()
   echo -n "$1" | sha256sum | xxd -r -p | base64 -w 0 | sed -e 's/\+/-/g' -e 's/\//\_/g' -e 's/=//g'
 }
 
+function api_curl()
+{
+  curl -s -o http_response.out -w '%{http_code}' "$@" > http_code.out
+  echo >> http_response.out
+  cat http_response.out
+}
+
 clean_up()
 {
   #ACCESS_TOKEN="$(curl -s ${AB_BASE_URL}/iam/v3/oauth/token -H 'Content-Type: application/x-www-form-urlencoded' -u "$AB_CLIENT_ID:$AB_CLIENT_SECRET" -d "grant_type=client_credentials" | jq --raw-output .access_token)"
@@ -49,21 +56,21 @@ curl -X POST -s "${AB_BASE_URL}/cloudsave/v1/admin/namespaces/$AB_NAMESPACE/plug
 
 echo Creating PLAYER ...
 
-USER_ID="$(curl -s "${AB_BASE_URL}/iam/v4/public/namespaces/$AB_NAMESPACE/users" -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/json' -d "{\"authType\":\"EMAILPASSWD\",\"country\":\"ID\",\"dateOfBirth\":\"1995-01-10\",\"displayName\":\"Cloudsave gRPC Player\",\"emailAddress\":\"${DEMO_PREFIX}_player@test.com\",\"password\":\"GFPPlmdb2-\",\"username\":\"${DEMO_PREFIX}_player\"}" | jq --raw-output .userId)"
+USER_ID="$(api_curl -s "${AB_BASE_URL}/iam/v4/public/namespaces/$AB_NAMESPACE/users" -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/json' -d "{\"authType\":\"EMAILPASSWD\",\"country\":\"ID\",\"dateOfBirth\":\"1995-01-10\",\"displayName\":\"Cloudsave gRPC Player\",\"emailAddress\":\"${DEMO_PREFIX}_player@test.com\",\"password\":\"GFPPlmdb2-\",\"username\":\"${DEMO_PREFIX}_player\"}" | jq --raw-output .userId)"
 
 if [ "$USER_ID" == "null" ]; then
-  echo "Failed to create player with email ${DEMO_PREFIX}_player@test.com, please delete existing first!"
+  cat http_response.out
   exit 1
 fi
 
 echo Test BeforeWritePlayerRecord an VALID payload ... 
 
-curl -X PUT -s "${AB_BASE_URL}/cloudsave/v1/admin/namespaces/$AB_NAMESPACE/users/$USER_ID/records/favourite_weapon" -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/json' -d '{"userId": "1e076bcee6d14c849ffb121c0e0135be", "favouriteWeaponType": "SWORD", "favouriteWeapon": "excalibur"}'
+api_curl -X PUT -s "${AB_BASE_URL}/cloudsave/v1/admin/namespaces/$AB_NAMESPACE/users/$USER_ID/records/favourite_weapon" -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/json' -d '{"userId": "1e076bcee6d14c849ffb121c0e0135be", "favouriteWeaponType": "SWORD", "favouriteWeapon": "excalibur"}'
 echo
 
 echo Test BeforeWritePlayerRecord an INVALID payload ... 
 
-curl -X PUT -s "${AB_BASE_URL}/cloudsave/v1/admin/namespaces/$AB_NAMESPACE/users/$USER_ID/records/favourite_weapon" -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/json' -d '{"foo":"bar"}' || true
+api_curl -X PUT -s "${AB_BASE_URL}/cloudsave/v1/admin/namespaces/$AB_NAMESPACE/users/$USER_ID/records/favourite_weapon" -H "Authorization: Bearer $ACCESS_TOKEN" -H 'Content-Type: application/json' -d '{"foo":"bar"}' || true
 echo
 
 # echo Logging in PLAYER ...
