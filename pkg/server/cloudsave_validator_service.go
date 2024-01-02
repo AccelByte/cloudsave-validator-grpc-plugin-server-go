@@ -219,6 +219,7 @@ func (s *CloudsaveValidatorServer) BeforeWriteGameBinaryRecord(ctx context.Conte
 			}, nil
 		}
 	}
+
 	return &pb.GameRecordValidationResult{IsSuccess: true, Key: request.Key}, nil
 }
 
@@ -237,6 +238,7 @@ func (s *CloudsaveValidatorServer) AfterReadGameBinaryRecord(ctx context.Context
 			}, nil
 		}
 	}
+
 	return &pb.GameRecordValidationResult{IsSuccess: true, Key: request.Key}, nil
 }
 
@@ -281,6 +283,7 @@ func (s *CloudsaveValidatorServer) BeforeWritePlayerBinaryRecord(ctx context.Con
 			}, nil
 		}
 	}
+
 	return &pb.PlayerRecordValidationResult{IsSuccess: true, Key: request.Key, UserId: request.UserId}, nil
 }
 
