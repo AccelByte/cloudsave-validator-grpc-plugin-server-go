@@ -7,6 +7,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -184,6 +187,115 @@ func (s *CloudsaveValidatorServer) BeforeWriteAdminPlayerRecord(ctx context.Cont
 	}
 
 	return &pb.PlayerRecordValidationResult{IsSuccess: true, Key: request.Key, UserId: request.UserId}, nil
+}
+
+func (s *CloudsaveValidatorServer) BeforeWriteGameBinaryRecord(ctx context.Context, request *pb.GameBinaryRecord) (*pb.GameRecordValidationResult, error) {
+	if strings.HasSuffix(request.GetKey(), "event_banner") && request.GetBinaryInfo() != nil {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, request.GetBinaryInfo().GetUrl(), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		fileSize, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+		if err != nil {
+			return nil, err
+		}
+
+		if fileSize/1000 > MaxSizeEventBannerInKB {
+			errorDetail := &pb.Error{
+				ErrorCode:    1,
+				ErrorMessage: fmt.Sprintf("maximum size for event banner is %d kB", MaxSizeEventBannerInKB),
+			}
+
+			return &pb.GameRecordValidationResult{
+				IsSuccess: false,
+				Key:       request.Key,
+				Error:     errorDetail,
+			}, nil
+		}
+	}
+	return &pb.GameRecordValidationResult{IsSuccess: true, Key: request.Key}, nil
+}
+
+func (s *CloudsaveValidatorServer) AfterReadGameBinaryRecord(ctx context.Context, request *pb.GameBinaryRecord) (*pb.GameRecordValidationResult, error) {
+	if strings.HasSuffix(request.GetKey(), "daily_event_stage") && request.GetBinaryInfo() != nil {
+		if !isSameDate(time.Now().UTC(), request.GetBinaryInfo().GetUpdatedAt().AsTime().UTC()) {
+			errorDetail := &pb.Error{
+				ErrorCode:    1,
+				ErrorMessage: fmt.Sprintf("today's %s is not ready yet", request.Key),
+			}
+
+			return &pb.GameRecordValidationResult{
+				IsSuccess: false,
+				Key:       request.Key,
+				Error:     errorDetail,
+			}, nil
+		}
+	}
+	return &pb.GameRecordValidationResult{IsSuccess: true, Key: request.Key}, nil
+}
+
+func (s *CloudsaveValidatorServer) AfterBulkReadGameBinaryRecord(ctx context.Context, request *pb.BulkGameBinaryRecord) (*pb.BulkGameRecordValidationResult, error) {
+	result := []*pb.GameRecordValidationResult{}
+
+	for _, record := range request.GetGameBinaryRecords() {
+		if strings.HasSuffix(record.GetKey(), "daily_event_stage") && record.GetBinaryInfo() != nil {
+			if !isSameDate(time.Now().UTC(), record.GetBinaryInfo().GetUpdatedAt().AsTime().UTC()) {
+				errorDetail := &pb.Error{
+					ErrorCode:    1,
+					ErrorMessage: fmt.Sprintf("today's %s is not ready yet", record.Key),
+				}
+
+				result = append(result, &pb.GameRecordValidationResult{
+					IsSuccess: false,
+					Key:       record.Key,
+					Error:     errorDetail,
+				})
+			} else {
+				result = append(result, &pb.GameRecordValidationResult{IsSuccess: true, Key: record.Key})
+			}
+		}
+	}
+
+	return &pb.BulkGameRecordValidationResult{ValidationResults: result}, nil
+}
+
+func (s *CloudsaveValidatorServer) BeforeWritePlayerBinaryRecord(ctx context.Context, request *pb.PlayerBinaryRecord) (*pb.PlayerRecordValidationResult, error) {
+	if strings.HasSuffix(request.GetKey(), "id_card") && request.GetBinaryInfo() != nil {
+		if request.GetBinaryInfo().GetVersion() > 1 {
+			errorDetail := &pb.Error{
+				ErrorCode:    1,
+				ErrorMessage: "id card can only be created once",
+			}
+
+			return &pb.PlayerRecordValidationResult{
+				IsSuccess: false,
+				Key:       request.Key,
+				UserId:    request.UserId,
+				Error:     errorDetail,
+			}, nil
+		}
+	}
+	return &pb.PlayerRecordValidationResult{IsSuccess: true, Key: request.Key, UserId: request.UserId}, nil
+}
+
+func (s *CloudsaveValidatorServer) AfterReadPlayerBinaryRecord(ctx context.Context, request *pb.PlayerBinaryRecord) (*pb.PlayerRecordValidationResult, error) {
+	return &pb.PlayerRecordValidationResult{IsSuccess: true, Key: request.Key, UserId: request.UserId}, nil
+}
+
+func (s *CloudsaveValidatorServer) AfterBulkReadPlayerBinaryRecord(ctx context.Context, request *pb.BulkPlayerBinaryRecord) (*pb.BulkPlayerRecordValidationResult, error) {
+	result := []*pb.PlayerRecordValidationResult{}
+
+	for _, record := range request.GetPlayerBinaryRecords() {
+		result = append(result, &pb.PlayerRecordValidationResult{IsSuccess: true, Key: record.Key, UserId: record.UserId})
+	}
+
+	return &pb.BulkPlayerRecordValidationResult{ValidationResults: result}, nil
 }
 
 func NewCloudsaveValidationServiceServer() *CloudsaveValidatorServer {

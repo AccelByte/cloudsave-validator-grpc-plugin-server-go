@@ -15,6 +15,8 @@ import (
 const (
 	WeaponTypeSword = "SWORD"
 	WeaponTypeGun   = "GUN"
+
+	MaxSizeEventBannerInKB = 100
 )
 
 type CustomGameRecord struct {
