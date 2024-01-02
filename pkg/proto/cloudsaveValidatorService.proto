@@ -5,7 +5,7 @@
 syntax = "proto3";
 
 package accelbyte.cloudsave.validator;
-// Version v1.0.0
+// Version v1.1.0
 
 import "google/protobuf/timestamp.proto";
 
