@@ -261,6 +261,8 @@ func (s *CloudsaveValidatorServer) AfterBulkReadGameBinaryRecord(ctx context.Con
 			} else {
 				result = append(result, &pb.GameRecordValidationResult{IsSuccess: true, Key: record.Key})
 			}
+		} else {
+			result = append(result, &pb.GameRecordValidationResult{IsSuccess: true, Key: record.Key})
 		}
 	}
 
