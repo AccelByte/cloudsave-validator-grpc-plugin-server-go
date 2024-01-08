@@ -52,18 +52,18 @@ ngrok:
 
 test_integration_local_hosted: proto
 	@test -n "$(ENV_PATH)" || (echo "ENV_PATH is not set"; exit 1)
-	docker build --tag revocation-test-integration -f test/functional/Dockerfile test/functional && \
+	docker build --tag cloudsave-test-integration -f test/functional/Dockerfile test/functional && \
 	docker run --rm -t \
 		--env-file $(ENV_PATH) \
 		-e GOCACHE=/data/.cache/go-build \
 		-e GOPATH=/data/.cache/mod \
 		-u $$(id -u):$$(id -g) \
 		-v $$(pwd):/data \
-		-w /data revocation-test-integration bash ./test/functional/test-local-hosted.sh
+		-w /data cloudsave-test-integration bash ./test/functional/test-local-hosted.sh
 
 test_integration_accelbyte_hosted: proto
 	@test -n "$(ENV_PATH)" || (echo "ENV_PATH is not set"; exit 1)
-	docker build --tag revocation-test-integration -f test/functional/Dockerfile test/functional && \
+	docker build --tag cloudsave-test-integration -f test/functional/Dockerfile test/functional && \
 	docker run --rm -t \
 		--env-file $(ENV_PATH) \
 		-e GOCACHE=/data/.cache/go-build \
@@ -73,4 +73,4 @@ test_integration_accelbyte_hosted: proto
 		--group-add $$(getent group docker | cut -d ':' -f 3) \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $$(pwd):/data \
-		-w /data revocation-test-integration bash ./test/functional/test-accelbyte-hosted.sh
+		-w /data cloudsave-test-integration bash ./test/functional/test-accelbyte-hosted.sh
