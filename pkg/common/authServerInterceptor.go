@@ -19,23 +19,39 @@ import (
 var OAuth *iam.OAuth20Service
 
 func UnaryAuthServerIntercept(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	err := checkAuthorizationMetadata(ctx)
+	if !skipCheckAuthorizationMetadata(info.FullMethod) {
+		err := checkAuthorizationMetadata(ctx)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return handler(ctx, req)
 }
 
 func StreamAuthServerIntercept(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	err := checkAuthorizationMetadata(ss.Context())
+	if !skipCheckAuthorizationMetadata(info.FullMethod) {
+		err := checkAuthorizationMetadata(ss.Context())
 
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	return handler(srv, ss)
+}
+
+func skipCheckAuthorizationMetadata(fullMethod string) bool {
+	if strings.HasPrefix(fullMethod, "/grpc.reflection.v1alpha.ServerReflection/") {
+		return true
+	}
+
+	if strings.HasPrefix(fullMethod, "/grpc.health.v1.Health/") {
+		return true
+	}
+
+	return false
 }
 
 func checkAuthorizationMetadata(ctx context.Context) error {
