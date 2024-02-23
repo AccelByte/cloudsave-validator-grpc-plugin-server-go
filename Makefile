@@ -50,7 +50,7 @@ ngrok:
 	docker run --rm -it --net=host -e NGROK_AUTHTOKEN=$(NGROK_AUTHTOKEN) ngrok/ngrok:3-alpine \
 			tcp 6565	# gRPC server port
 
-test_integration_local_hosted: proto
+test_functional_local_hosted: proto
 	@test -n "$(ENV_PATH)" || (echo "ENV_PATH is not set"; exit 1)
 	docker build --tag cloudsave-test-integration -f test/functional/Dockerfile test/functional && \
 	docker run --rm -t \
@@ -61,7 +61,7 @@ test_integration_local_hosted: proto
 		-v $$(pwd):/data \
 		-w /data cloudsave-test-integration bash ./test/functional/test-local-hosted.sh
 
-test_integration_accelbyte_hosted: proto
+test_functional_accelbyte_hosted: proto
 	@test -n "$(ENV_PATH)" || (echo "ENV_PATH is not set"; exit 1)
 	docker build --tag cloudsave-test-integration -f test/functional/Dockerfile test/functional && \
 	docker run --rm -t \
