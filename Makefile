@@ -12,18 +12,6 @@ BUILD_CACHE_VOLUME := $(shell echo '$(PROJECT_NAME)' | sed 's/[^a-zA-Z0-9_-]//g'
 IMAGE_NAME := $(shell basename "$$(pwd)")-app
 BUILDER := extend-builder
 
-proto:
-	rm -rfv pkg/pb/*
-	mkdir -p pkg/pb
-	docker run -t --rm \
-			-u $$(id -u):$$(id -g) \
-			-v $$(pwd):/data/ \
-			-w /data/ \
-			rvolosatovs/protoc:4.0.0 \
-			--proto_path=pkg/proto --go_out=pkg/pb \
-			--go_opt=paths=source_relative --go-grpc_out=pkg/pb \
-			--go-grpc_opt=paths=source_relative pkg/proto/*.proto
-
 build: proto
 	docker run -t --rm \
 			-v $(BUILD_CACHE_VOLUME):/tmp/build-cache \
@@ -38,6 +26,18 @@ build: proto
 			-w /data/ \
 			$(GOLANG_IMAGE) \
 			go build -modcacherw
+
+proto:
+	rm -rfv pkg/pb/*
+	mkdir -p pkg/pb
+	docker run -t --rm \
+			-u $$(id -u):$$(id -g) \
+			-v $$(pwd):/data/ \
+			-w /data/ \
+			rvolosatovs/protoc:4.0.0 \
+			--proto_path=pkg/proto --go_out=pkg/pb \
+			--go_opt=paths=source_relative --go-grpc_out=pkg/pb \
+			--go-grpc_opt=paths=source_relative pkg/proto/*.proto
 
 image:
 	docker buildx build -t ${IMAGE_NAME} --load .
