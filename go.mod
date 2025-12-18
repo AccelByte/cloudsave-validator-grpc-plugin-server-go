@@ -3,7 +3,7 @@ module cloudsave-validator-grpc-plugin-server-go
 go 1.24
 
 require (
-	github.com/AccelByte/accelbyte-go-sdk v0.80.0
+	github.com/AccelByte/accelbyte-go-sdk v0.85.0
 	github.com/AccelByte/justice-input-validation-go v0.0.7
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.0-rc.0
